@@ -4,7 +4,7 @@ A Vue 3 `<DwgViewer>` component that renders `.dxf`/`.dwg` files entirely
 client-side. It's built from the [dwgviewer](https://github.com/librecad/librecad)-derived
 Qt-free parsing layer (vendored below, no external checkout dependency),
 compiled to WebAssembly, plus a Canvas2D reimplementation of that layer's
-`ViewerWidget` (zoom-fit, wheel-zoom-around-cursor, middle-drag pan).
+`ViewerWidget` (zoom-fit, wheel-zoom-around-cursor, left-drag pan).
 
 ```
 file.dxf/.dwg -> Emscripten (libdxfrw + dwg_document.cpp) -> Shape[]/BoundingBox
@@ -170,8 +170,11 @@ const viewer = ref<InstanceType<typeof DwgViewer> | null>(null);
 ### Built-in interaction
 
 - **Mouse wheel** -- zoom in/out, centered on the cursor.
-- **Middle-mouse drag** -- pan (matches the original desktop viewer's
-  binding; left-drag does not pan).
+- **Left-mouse drag** -- pan. (The original desktop viewer binds this to
+  the middle button; that's deliberately not used here -- on Linux, holding
+  the middle button and dragging gets hijacked by the browser itself, e.g.
+  Chrome/Firefox's autoscroll or Firefox's primary-selection-paste-as-URL,
+  in ways a web page can't reliably suppress.)
 - Resizing the container always re-fits the view rather than preserving
   pan/zoom.
 

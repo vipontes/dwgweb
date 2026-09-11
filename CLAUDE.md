@@ -169,8 +169,12 @@ handling; delegates all actual parsing to `parser.ts` and all drawing to
 
 Resize policy is intentionally simple: every resize triggers a full re-fit
 (`zoomFit()`), discarding the user's current pan/zoom, rather than
-preserving it. Middle-mouse-button drag pans (not left-drag); this matches
-the original desktop viewer's binding.
+preserving it. Left-mouse-button drag pans. The original desktop viewer
+binds pan to the middle button instead, but on Linux, holding the middle
+button down and dragging gets hijacked by the browser itself (Chrome/Firefox
+autoscroll, Firefox's primary-selection-paste-as-URL) in ways `preventDefault()`
+can't reliably suppress from page JS, so this deviates from
+`ViewerWidget::mousePressEvent` to avoid it.
 
 ### Build tooling gotcha: Vite library mode force-inlines assets
 

@@ -166,12 +166,17 @@ function onWheel(event: WheelEvent): void {
 }
 
 function onPointerDown(event: PointerEvent): void {
-  if (event.button !== 1) return; // middle-button pan, matching ViewerWidget::mousePressEvent
+  // Left-button pan. The original desktop viewer binds this to the middle
+  // button, but on Linux both Firefox and Chrome hijack a held-down middle
+  // button for their own purposes (autoscroll, primary-selection paste-as-URL)
+  // in ways that can't be reliably suppressed from page JS, so this diverges
+  // from ViewerWidget::mousePressEvent to sidestep that entirely.
+  if (event.button !== 0) return;
+  event.preventDefault();
   panning = true;
   lastPanX = event.clientX;
   lastPanY = event.clientY;
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  event.preventDefault();
 }
 
 function onPointerMove(event: PointerEvent): void {
@@ -185,14 +190,9 @@ function onPointerMove(event: PointerEvent): void {
 }
 
 function onPointerUp(event: PointerEvent): void {
-  if (event.button !== 1) return;
+  if (event.button !== 0) return;
+  event.preventDefault();
   panning = false;
-}
-
-function onAuxClick(event: MouseEvent): void {
-  // Middle-button pan can otherwise trigger the browser's own middle-click
-  // action (e.g. opening a new tab) once the pointer is released.
-  if (event.button === 1) event.preventDefault();
 }
 
 defineExpose({ zoomFit: () => { zoomFit(); render(); } });
@@ -223,7 +223,6 @@ watch(() => props.source, () => {
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
-      @auxclick="onAuxClick"
     />
   </div>
 </template>
