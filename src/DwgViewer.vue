@@ -82,17 +82,25 @@ function render(): void {
   renderShapes(ctx, drawing.value.shapes, { documentToScreen: transform, pixelRatio });
 }
 
-function resizeCanvasToContainer(): void {
+function resizeCanvasToContainer(width?: number, height?: number): void {
   const canvas = canvasEl.value;
   const container = containerEl.value;
   if (!canvas || !container) return;
+
+  // Use provided dimensions (from ResizeObserver entry) when available to
+  // avoid re-querying the DOM mid-layout, which can return an already-mutated
+  // size and feed a resize loop.
+  const w = Math.max(1, Math.floor(width ?? container.clientWidth));
+  const h = Math.max(1, Math.floor(height ?? container.clientHeight));
   const pixelRatio = window.devicePixelRatio || 1;
-  const width = Math.max(1, container.clientWidth);
-  const height = Math.max(1, container.clientHeight);
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
-  canvas.width = Math.round(width * pixelRatio);
-  canvas.height = Math.round(height * pixelRatio);
+  const newW = Math.round(w * pixelRatio);
+  const newH = Math.round(h * pixelRatio);
+
+  // Skip if the bitmap dimensions haven't actually changed.
+  if (canvas.width === newW && canvas.height === newH) return;
+
+  canvas.width = newW;
+  canvas.height = newH;
 
   // Simple policy, matching ViewerWidget::resizeEvent(): always re-fit on
   // resize rather than preserving the user's current pan/zoom.
@@ -198,7 +206,19 @@ function onPointerUp(event: PointerEvent): void {
 defineExpose({ zoomFit: () => { zoomFit(); render(); } });
 
 onMounted(() => {
-  resizeObserver = new ResizeObserver(() => resizeCanvasToContainer());
+  resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      // Use the observer-reported content-box size so we never re-query a
+      // mid-layout DOM value that may already reflect a previous mutation.
+      const box = entry.contentBoxSize?.[0];
+      if (box) {
+        resizeCanvasToContainer(box.inlineSize, box.blockSize);
+      } else {
+        // Fallback for older browsers without contentBoxSize.
+        resizeCanvasToContainer(entry.contentRect.width, entry.contentRect.height);
+      }
+    }
+  });
   if (containerEl.value) resizeObserver.observe(containerEl.value);
   resizeCanvasToContainer();
   void loadSource();
@@ -214,10 +234,15 @@ watch(() => props.source, () => {
 </script>
 
 <template>
-  <div ref="containerEl" class="dwg-viewer-root">
+  <div
+    ref="containerEl"
+    class="dwg-viewer-root"
+    :style="{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', minWidth: '200px', minHeight: '200px' }"
+  >
     <canvas
       ref="canvasEl"
       class="dwg-viewer-canvas"
+      :style="{ position: 'absolute', inset: '0', width: '100%', height: '100%' }"
       @wheel="onWheel"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
@@ -239,6 +264,8 @@ watch(() => props.source, () => {
 }
 .dwg-viewer-canvas {
   display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   cursor: default;
