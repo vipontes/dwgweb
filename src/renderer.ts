@@ -2,6 +2,8 @@
 // drawing logic and its wheel-zoom/pan transform math, reimplemented against
 // Canvas2D/DOMMatrix. Comments here call out the C++ counterpart for each
 // piece; anything not explained is the same math translated line-for-line.
+import type { FontCache } from './fontLoader';
+import { findGlyph, type LffFont } from './lffFont';
 import {
   type BoundingBox,
   type HatchLoop,
@@ -433,8 +435,116 @@ function drawHatchPatternLine(
 }
 
 // --- text --------------------------------------------------------------
+//
+// Port of viewer_widget.cpp's "LFF stroke-font resolution" + Text paint
+// case. Only entities whose STYLE table names a font this project ships a
+// .lff for (resources/fonts/*.lff, resolved via fontLoader.ts's FontCache)
+// take the stroke-font path below; everything else (no STYLE override, or
+// one naming e.g. a TTF font) falls through to the browser's own font
+// rendering exactly as before LFF support existed.
 
-function drawText(ctx: CanvasRenderingContext2D, s: Shape, documentToScreen: DOMMatrix, pixelRatio: number): void {
+// AutoCAD/LibreCAD's MTEXT line-spacing-factor 1.0 corresponds to roughly
+// 5/3 of the text height between baselines ("exact" spacing) -- there's no
+// per-font metric for this in the .lff format itself (unlike LetterSpacing/
+// WordSpacing), so this is a fixed approximation shared by every LFF font,
+// matching kLffLineSpacingRatio in viewer_widget.cpp.
+const LFF_LINE_SPACING_RATIO = 5 / 3;
+
+/** Port of lffStepGlyph(): looks up `cp` in `font`, then `fallback`, returning this character's advance (font design units, already includes `font`'s own LetterSpacing) regardless of whether a glyph was found. */
+function lffStepGlyph(
+  font: LffFont,
+  fallback: LffFont | null,
+  cp: number,
+): { glyph: ReturnType<typeof findGlyph>; advance: number } {
+  const glyph = findGlyph(font, cp) ?? (fallback ? findGlyph(fallback, cp) : undefined);
+  const advance = (glyph ? glyph.advance : font.wordSpacing) + font.letterSpacing;
+  return { glyph, advance };
+}
+
+/** Port of lffLineWidth(). */
+function lffLineWidth(font: LffFont, fallback: LffFont | null, line: string): number {
+  let width = 0;
+  for (const ch of line) width += lffStepGlyph(font, fallback, ch.codePointAt(0) ?? 0).advance;
+  return width;
+}
+
+/**
+ * Port of drawLffTextLines(): draws `lines` (already split on '\n') using
+ * `font` (falling back to `fallback` per-glyph) into the ctx's *current*
+ * local transform -- caller has already translated/rotated to the text
+ * entity's anchor exactly like the browser-font path below, so this only
+ * needs to place glyphs relative to that origin. `capHeightPx` is the
+ * on-screen pixel size of the font's 9-design-unit cap height.
+ */
+function drawLffTextLines(
+  ctx: CanvasRenderingContext2D,
+  lines: string[],
+  font: LffFont,
+  fallback: LffFont | null,
+  capHeightPx: number,
+  hAlign: TextHAlign,
+  vAlign: TextVAlign,
+): void {
+  const scale = capHeightPx / 9;
+  const linePitchPx = capHeightPx * font.lineSpacingFactor * LFF_LINE_SPACING_RATIO;
+  const blockHeight = linePitchPx * lines.length;
+
+  let firstBaselineY: number;
+  switch (vAlign) {
+    case TextVAlign.Top:
+      firstBaselineY = capHeightPx;
+      break;
+    case TextVAlign.Middle:
+      firstBaselineY = capHeightPx - blockHeight / 2;
+      break;
+    case TextVAlign.Bottom:
+      firstBaselineY = capHeightPx - blockHeight;
+      break;
+    default:
+      firstBaselineY = 0;
+  }
+
+  const path = new Path2D();
+  let y = firstBaselineY;
+  for (const line of lines) {
+    let startX = 0;
+    if (hAlign === TextHAlign.Center) startX = (-lffLineWidth(font, fallback, line) * scale) / 2;
+    else if (hAlign === TextHAlign.Right) startX = -lffLineWidth(font, fallback, line) * scale;
+
+    let penX = 0;
+    for (const ch of line) {
+      const cp = ch.codePointAt(0) ?? 0;
+      const { glyph, advance } = lffStepGlyph(font, fallback, cp);
+      if (glyph) {
+        // Glyph coordinates are Y-up (baseline at y=0, caps extend to
+        // y=+9) but this local transform still follows Canvas2D's own
+        // Y-down convention (only documentToScreen carries a flip, and
+        // Text deliberately never composes with it -- see drawText) -- so
+        // each point's Y must be negated here, the same "flip glyphs
+        // explicitly, don't inherit one" rule.
+        for (const stroke of glyph.strokes) {
+          for (let i = 1; i < stroke.length; i++) {
+            const a = stroke[i - 1];
+            const b = stroke[i];
+            path.moveTo(startX + (penX + a.x) * scale, y - a.y * scale);
+            path.lineTo(startX + (penX + b.x) * scale, y - b.y * scale);
+          }
+        }
+      }
+      penX += advance;
+    }
+    y += linePitchPx;
+  }
+  ctx.stroke(path);
+}
+
+function drawText(
+  ctx: CanvasRenderingContext2D,
+  s: Shape,
+  documentToScreen: DOMMatrix,
+  pixelRatio: number,
+  fonts: FontCache | undefined,
+): void {
   if (!s.text) return;
   const pixelsPerUnit = Math.abs(documentToScreen.a);
   if (pixelsPerUnit <= 0) return;
@@ -453,12 +563,22 @@ function drawText(ctx: CanvasRenderingContext2D, s: Shape, documentToScreen: DOM
   ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   ctx.translate(originScreen.x, originScreen.y);
   ctx.rotate(-s.textAngleRad);
+
+  const lines = s.text.split('\n');
+  const lffFont = fonts?.fontFor(s.fontFile) ?? null;
+  if (lffFont) {
+    ctx.strokeStyle = rgbToCss(s.color);
+    ctx.lineWidth = 1 / pixelRatio; // cosmetic: always ~1 device pixel, matching the rest of the renderer
+    drawLffTextLines(ctx, lines, lffFont, fonts?.fallbackFont ?? null, pixelHeight, s.textHAlign, s.textVAlign);
+    ctx.restore();
+    return;
+  }
+
   ctx.font = `${pixelHeight}px sans-serif`;
   ctx.fillStyle = rgbToCss(s.color);
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = s.textHAlign === TextHAlign.Center ? 'center' : s.textHAlign === TextHAlign.Right ? 'right' : 'left';
 
-  const lines = s.text.split('\n');
   const metrics = ctx.measureText('Mgjy');
   const ascent = metrics.fontBoundingBoxAscent ?? pixelHeight * 0.8;
   const descent = metrics.fontBoundingBoxDescent ?? pixelHeight * 0.2;
@@ -603,11 +723,13 @@ export interface Viewport {
   documentToScreen: DOMMatrix;
   /** devicePixelRatio the canvas's backing store is scaled by; 1 if the caller already sized the canvas in device pixels. */
   pixelRatio: number;
+  /** Resolved (see FontCache.preload) LFF stroke fonts for this drawing's Text shapes. Omitted/no matching font -> falls back to the browser's own font rendering, same as before LFF support existed. */
+  fonts?: FontCache;
 }
 
 /** Port of ViewerWidget::paintEvent()'s shape loop. Caller owns clearing/filling the background. */
 export function renderShapes(ctx: CanvasRenderingContext2D, shapes: Shape[], viewport: Viewport): void {
-  const { documentToScreen, pixelRatio } = viewport;
+  const { documentToScreen, pixelRatio, fonts } = viewport;
   const full = new DOMMatrix([pixelRatio, 0, 0, pixelRatio, 0, 0]).multiply(documentToScreen);
   ctx.setTransform(full);
 
@@ -631,7 +753,7 @@ export function renderShapes(ctx: CanvasRenderingContext2D, shapes: Shape[], vie
         drawPolyline(ctx, s);
         break;
       case ShapeKind.Text:
-        drawText(ctx, s, documentToScreen, pixelRatio);
+        drawText(ctx, s, documentToScreen, pixelRatio, fonts);
         break;
       case ShapeKind.Hatch:
         drawHatch(ctx, s);

@@ -5,16 +5,24 @@
 // project's own design notes: that's the right shape for a "drop this into
 // any Vue app" viewer.
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { FontCache } from './fontLoader';
 import { parseDrawing } from './parser';
 import { computeZoomFitTransform, panByScreenDelta, renderShapes, zoomAroundPoint } from './renderer';
-import { isValidBoundingBox, type ParsedDrawing } from './types';
+import { isValidBoundingBox, ShapeKind, type ParsedDrawing } from './types';
 
 const props = defineProps<{
   /** The drawing to load: a File (name gives the .dxf/.dwg extension), raw bytes (pair with fileName), or a URL to fetch. */
   source?: File | ArrayBuffer | Uint8Array | string | null;
   /** Required when `source` is raw bytes rather than a File/URL, so the dxf/dwg reader can be picked. */
   fileName?: string;
+  /** Overrides where TEXT/MTEXT stroke fonts (resources/fonts/*.lff) are fetched from -- see fontLoader.ts's defaultFontsBaseUrl() for what it resolves to otherwise. */
+  fontsBaseUrl?: string;
 }>();
+
+// One FontCache per component instance (not per load) so a font fetched for
+// one drawing is reused across subsequent `source` changes rather than
+// re-fetched -- see FontCache's own doc comment.
+const fontCache = new FontCache(props.fontsBaseUrl);
 
 const emit = defineEmits<{
   loaded: [drawing: ParsedDrawing];
@@ -79,7 +87,7 @@ function render(): void {
   if (!drawing.value || !transform || !hasFitOnce) return;
   ctx.imageSmoothingEnabled = true;
   const pixelRatio = window.devicePixelRatio || 1;
-  renderShapes(ctx, drawing.value.shapes, { documentToScreen: transform, pixelRatio });
+  renderShapes(ctx, drawing.value.shapes, { documentToScreen: transform, pixelRatio, fonts: fontCache });
 }
 
 function resizeCanvasToContainer(width?: number, height?: number): void {
@@ -147,6 +155,14 @@ async function loadSource(): Promise<void> {
       emit('error', parsed.errorMessage);
       return;
     }
+    // Preload every STYLE font this drawing's Text shapes actually
+    // reference (plus the unicode.lff fallback) before the first render, so
+    // TEXT/MTEXT draws with its real stroke font from the start rather than
+    // flashing the browser-font fallback in and then swapping -- mirrors
+    // dwgviewer's lffFontFor() being synchronous (a local file read) by
+    // making the one round of network fetches this needs happen up front.
+    const fontFiles = parsed.shapes.filter((s) => s.kind === ShapeKind.Text).map((s) => s.fontFile);
+    await fontCache.preload(fontFiles);
     drawing.value = parsed;
     zoomFit();
     emit('loaded', parsed);

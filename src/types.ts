@@ -78,6 +78,8 @@ export interface Shape {
   textAngleRad: number;
   textHAlign: TextHAlign;
   textVAlign: TextVAlign;
+  /** Text / MText only. The STYLE table's font file name (e.g. "romans.shx"), verbatim and unresolved -- see fontLoader.ts's stem-based lookup against resources/fonts/*.lff. Empty when unknown, which the renderer treats as "use the browser's fallback font". */
+  fontFile: string;
 
   hatchLoops: HatchLoop[];
   hatchFillKind: HatchFillKind;

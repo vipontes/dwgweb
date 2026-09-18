@@ -13,7 +13,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "resources"
   ],
   "scripts": {
     "build:wasm": "bash wasm/build.sh release",

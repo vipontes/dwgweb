@@ -102,6 +102,7 @@ EMSCRIPTEN_BINDINGS(dwg_module) {
         .field("textAngleRad", &Shape::textAngleRad)
         .field("textHAlign", &Shape::textHAlign)
         .field("textVAlign", &Shape::textVAlign)
+        .field("fontFile", &Shape::fontFile)
         .field("hatchLoops", &Shape::hatchLoops)
         .field("hatchFillKind", &Shape::hatchFillKind)
         .field("hatchColor2", &Shape::hatchColor2)
