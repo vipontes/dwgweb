@@ -39,9 +39,8 @@ const loadError = ref<string | null>(null);
 let transform: DOMMatrix | null = null;
 let hasFitOnce = false;
 let resizeObserver: ResizeObserver | null = null;
-let panning = false;
-let lastPanX = 0;
-let lastPanY = 0;
+const activePointers = new Map<number, { x: number; y: number }>();
+let lastPinch: { midX: number; midY: number; distance: number } | null = null;
 
 const statusMessage = computed(() => {
   if (loading.value) return 'Loading drawing…';
@@ -189,34 +188,64 @@ function onWheel(event: WheelEvent): void {
   render();
 }
 
+// Touch gestures: one pointer pans, two pointers pinch-zoom (and pan with the
+// midpoint between them). A third simultaneous pointer is ignored.
+function pinchState(): { midX: number; midY: number; distance: number } | null {
+  const canvas = canvasEl.value;
+  if (!canvas || activePointers.size !== 2) return null;
+  const rect = canvas.getBoundingClientRect();
+  const [a, b] = [...activePointers.values()];
+  return {
+    midX: (a.x + b.x) / 2 - rect.left,
+    midY: (a.y + b.y) / 2 - rect.top,
+    distance: Math.hypot(a.x - b.x, a.y - b.y),
+  };
+}
+
 function onPointerDown(event: PointerEvent): void {
   // Left-button pan. The original desktop viewer binds this to the middle
   // button, but on Linux both Firefox and Chrome hijack a held-down middle
   // button for their own purposes (autoscroll, primary-selection paste-as-URL)
   // in ways that can't be reliably suppressed from page JS, so this diverges
   // from ViewerWidget::mousePressEvent to sidestep that entirely.
-  if (event.button !== 0) return;
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  if (activePointers.size >= 2) return;
   event.preventDefault();
-  panning = true;
-  lastPanX = event.clientX;
-  lastPanY = event.clientY;
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  lastPinch = pinchState();
 }
 
 function onPointerMove(event: PointerEvent): void {
-  if (!panning || !transform) return;
-  const dx = event.clientX - lastPanX;
-  const dy = event.clientY - lastPanY;
-  lastPanX = event.clientX;
-  lastPanY = event.clientY;
-  transform = panByScreenDelta(transform, dx, dy);
+  const previous = activePointers.get(event.pointerId);
+  if (!previous || !transform) return;
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (activePointers.size === 2) {
+    const pinch = pinchState();
+    if (!pinch) return;
+    if (lastPinch && lastPinch.distance > 0 && pinch.distance > 0) {
+      // Pan by how far the midpoint moved, then scale around the new
+      // midpoint, so the drawing point under the fingers stays under them.
+      transform = panByScreenDelta(transform, pinch.midX - lastPinch.midX, pinch.midY - lastPinch.midY);
+      transform = zoomAroundPoint(transform, pinch.midX, pinch.midY, pinch.distance / lastPinch.distance);
+      render();
+    }
+    lastPinch = pinch;
+    return;
+  }
+
+  transform = panByScreenDelta(transform, event.clientX - previous.x, event.clientY - previous.y);
   render();
 }
 
 function onPointerUp(event: PointerEvent): void {
-  if (event.button !== 0) return;
+  if (event.pointerType === 'mouse' && event.type === 'pointerup' && event.button !== 0) return;
   event.preventDefault();
-  panning = false;
+  activePointers.delete(event.pointerId);
+  // Going from two fingers to one resumes panning from the remaining
+  // finger's current position (the map already holds it), with no jump.
+  lastPinch = null;
 }
 
 defineExpose({ zoomFit: () => { zoomFit(); render(); } });
