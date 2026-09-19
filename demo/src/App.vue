@@ -2,8 +2,8 @@
 import { ref } from 'vue';
 import { DwgViewer, type ParsedDrawing } from 'dwg-viewer';
 
-const source = ref<File | string | null>('/samples/basic.dxf');
-const fileName = ref<string | undefined>('basic.dxf');
+const source = ref<File | string | null>(null);
+const fileName = ref<string | undefined>(undefined);
 const status = ref('');
 
 function onFileChange(event: Event): void {
