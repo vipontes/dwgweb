@@ -1,6 +1,6 @@
 {
   "name": "dwg-viewer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vue 3 component that renders DXF/DWG files via a WebAssembly build of dwgviewer's Qt-free parser (libdxfrw + dwg_document) and a Canvas2D port of its renderer.",
   "type": "module",
   "main": "./dist/dwg-viewer.js",
