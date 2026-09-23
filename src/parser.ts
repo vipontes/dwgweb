@@ -103,6 +103,7 @@ function toShape(s: WasmValue): Shape {
     textAngleRad: s.textAngleRad,
     textHAlign: s.textHAlign.value,
     textVAlign: s.textVAlign.value,
+    textWidthFactor: s.textWidthFactor,
     fontFile: s.fontFile,
     hatchLoops: vecToArray(s.hatchLoops, toHatchLoop),
     hatchFillKind: s.hatchFillKind.value,

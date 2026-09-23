@@ -144,18 +144,28 @@ struct Shape {
     TextHAlign textHAlign = TextHAlign::Left;
     TextVAlign textVAlign = TextVAlign::Baseline;
 
+    // Text / MText only. DXF/DWG code 41 ("width factor" / "Relative X
+    // scale factor") -- a horizontal-only stretch applied on top of the
+    // glyphs' own uniform height scale, e.g. 0.8 draws visibly narrower/
+    // more condensed characters than 1.0. This is DRW_Text::widthscale
+    // verbatim (already resolved per-entity by libdxfrw; DRW_MText inherits
+    // the same field). See ViewerWidget's Text case for why this can't go
+    // through documentToScreen_ like Line/Circle/Polyline do -- same
+    // "build a local screen-space transform" reasoning as textAngleRad.
+    double textWidthFactor = 1.0;
+
     // Text / MText only. The entity's STYLE table entry's own font file
     // name (DXF/DWG code 3, e.g. "romans.shx" or "iso.shx"), verbatim and
     // unresolved -- see DwgDocument::addTextStyle. Empty when the entity's
     // style name isn't in the file's STYLE table at all (a minimal/hand-
     // written file that never writes one). Kept as the raw string rather
     // than resolved to a loaded font here, same reasoning as `color`/
-    // `dashPattern` NOT being resolved in DwgDocument -- except here it's
+    // `dashPattern` NOT being resolved in ViewerWidget -- except here it's
     // the other way around: resolving *which* font file to use is a
     // document-model question (this project's own STYLE table), but
-    // finding and parsing that file (fetched over HTTP in this project,
-    // see src/fontLoader.ts) is a rendering concern, so Shape carries the
-    // name, not the parsed font, keeping this header render-target-free.
+    // finding and parsing that file on disk is a rendering concern
+    // (ViewerWidget::lffFontFor), so Shape carries the name, not the
+    // parsed font, keeping this header Qt/filesystem-free.
     std::string fontFile;
 
     // Hatch only: one or more closed boundary loops (an outer boundary
@@ -179,6 +189,22 @@ struct Shape {
     // Hatch/Pattern only: the file's own pattern definition lines, already
     // in radians -- see HatchPatternLine.
     std::vector<HatchPatternLine> hatchPatternLines;
+
+    // Hatch/Pattern only, and only set when the file carried *no* pattern
+    // definition lines of its own (hatchPatternLines empty): the pattern's
+    // name (DXF/DWG code 2, verbatim -- e.g. "ANSI31") plus the hatch's own
+    // scale (code 41) and angle (code 52, already in radians) and the
+    // document-space point the pattern tiles from. ViewerWidget resolves the
+    // name against resources/patterns/<name>.dxf (see hatchTileFor) -- same
+    // "model carries the name, viewer finds the file" split as `fontFile`,
+    // keeping this header Qt/filesystem-free. This is the only source for a
+    // DWG hatch (libdxfrw's DRW_Hatch::parseDwg skips over the definition
+    // lines instead of storing them) and for a DXF written by a tool that
+    // only records the name (e.g. LibreCAD).
+    std::string hatchPatternName;
+    double hatchPatternScale = 1.0;
+    double hatchPatternAngleRad = 0.0;
+    Point2D hatchPatternOrigin;
 };
 
 // 2D affine transform (x' = a*x + c*y + e; y' = b*x + d*y + f), used only to
@@ -310,6 +336,23 @@ private:
     // so they must never be counted in the auto-fit bounding box -- only
     // resolveInserts() pushes their transformed copies into shapes_.
     void addShape(Shape shape);
+
+    // True if a top-level entity (one reached with insideBlock_ false) is on
+    // Model Space and should be rendered. This viewer has no concept of
+    // paper space layouts/viewports at all (see CLAUDE.md's "not
+    // implemented yet" list) -- it only ever intends to show Model Space,
+    // the same content a CAD editor's "Model" tab shows. Every genuine
+    // top-level add*() callback (addLine/addText/addInsert/... -- the ones
+    // DRW_Interface actually calls with parsed file data, not the internal
+    // dimension-geometry helpers those call into) checks this first and
+    // returns early when it's false, same shape as the insideBlock_ check
+    // addShape() itself already does. Block-local geometry is exempt --
+    // called with insideBlock_ true, where an entity's own space is not
+    // meaningful (it isn't placed until resolveInserts() transforms a copy
+    // per already-Model-Space-filtered INSERT).
+    bool isModelSpaceEntity_(DRW::Space space) const {
+        return insideBlock_ || space == DRW::ModelSpace;
+    }
 
     // Builds a Text-kind Shape from a DRW_Text/DRW_MText/DRW_Attrib without
     // pushing it anywhere (unlike addText/addMText, which call addShape()
@@ -473,7 +516,7 @@ private:
     // TEXT/MTEXT entity's own style name (code 7) to fill in Shape::
     // fontFile. A style name absent from this map (entity references a
     // style the file's STYLE table never defined) leaves Shape::fontFile
-    // empty, which the renderer treats as "use the browser's fallback font".
+    // empty, which ViewerWidget treats as "use the Qt fallback font".
     std::unordered_map<std::string, std::string> textStyleFonts_;
     std::unordered_map<std::string, std::vector<double>> linePatterns_; // raw, unscaled (code-49 values)
     double globalLtScale_ = 1.0; // $LTSCALE header variable
@@ -524,4 +567,9 @@ private:
     // and DWG -- only genuinely reusable named blocks get captured here.
     bool insideBlock_ = false;
     std::string currentBlockName_;
+
+    // True while loadFile() is reading a .dwg. libdxfrw stores some angles
+    // raw in each format's own unit (DXF degrees, DWG radians) -- see
+    // addHatch's use of DRW_Hatch::angle.
+    bool readingDwg_ = false;
 };

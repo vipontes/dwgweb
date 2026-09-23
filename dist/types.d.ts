@@ -59,6 +59,8 @@ export interface Shape {
     textAngleRad: number;
     textHAlign: TextHAlign;
     textVAlign: TextVAlign;
+    /** Text / MText only. DXF/DWG code 41 ("width factor") -- a horizontal-only stretch on top of the glyphs' own uniform height scale. TEXT/ATTRIB/ATTDEF carry a real per-entity value here; MTEXT always reports 1.0 (no stretch) -- the C++ model deliberately does NOT read DRW_MText's own `widthscale` field, since libdxfrw reuses it for an unrelated quantity (the MTEXT reference-rectangle wrap width) that would wildly distort rendering if treated as a glyph stretch factor. See native/dwg_document.cpp's makeMTextShape comment. */
+    textWidthFactor: number;
     /** Text / MText only. The STYLE table's font file name (e.g. "romans.shx"), verbatim and unresolved -- see fontLoader.ts's stem-based lookup against resources/fonts/*.lff. Empty when unknown, which the renderer treats as "use the browser's fallback font". */
     fontFile: string;
     hatchLoops: HatchLoop[];

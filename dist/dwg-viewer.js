@@ -24,9 +24,9 @@ function gt(t, e, o) {
   if (Math.abs(o) < 1e-9) return null;
   const n = e.x - t.x, r = e.y - t.y, s = Math.hypot(n, r);
   if (s < 1e-9) return null;
-  const i = o >= 0 ? 1 : -1, a = 2 * Math.atan(Math.abs(o)), l = s / 2 / Math.sin(a), c = (t.x + e.x) / 2, h = (t.y + e.y) / 2, u = i > 0 ? -r : r, p = i > 0 ? n : -n, x = Math.hypot(u, p), M = l * Math.cos(a), m = { x: c + u / x * M, y: h + p / x * M };
-  let P = Math.atan2(t.y - m.y, t.x - m.x), b = Math.atan2(e.y - m.y, e.x - m.x);
-  return i > 0 ? b < P && (b += 2 * Math.PI) : b > P && (b -= 2 * Math.PI), { center: m, radius: l, startAngle: P, endAngle: b };
+  const i = o >= 0 ? 1 : -1, a = 2 * Math.atan(Math.abs(o)), l = s / 2 / Math.sin(a), c = (t.x + e.x) / 2, h = (t.y + e.y) / 2, u = i > 0 ? -r : r, m = i > 0 ? n : -n, x = Math.hypot(u, m), M = l * Math.cos(a), p = { x: c + u / x * M, y: h + m / x * M };
+  let w = Math.atan2(t.y - p.y, t.x - p.x), b = Math.atan2(e.y - p.y, e.x - p.x);
+  return i > 0 ? b < w && (b += 2 * Math.PI) : b > w && (b -= 2 * Math.PI), { center: p, radius: l, startAngle: w, endAngle: b };
 }
 function yt(t, e, o, n) {
   const r = gt(e, o, n);
@@ -36,8 +36,8 @@ function yt(t, e, o, n) {
   }
   const { center: s, radius: i, startAngle: a, endAngle: l } = r, c = l - a, h = Math.min(64, Math.max(2, Math.ceil(Math.abs(c) / (Math.PI / 24))));
   for (let u = 1; u <= h; u++) {
-    const p = a + c * u / h;
-    t.push({ x: s.x + i * Math.cos(p), y: s.y + i * Math.sin(p) });
+    const m = a + c * u / h;
+    t.push({ x: s.x + i * Math.cos(m), y: s.y + i * Math.sin(m) });
   }
 }
 function mt(t) {
@@ -198,7 +198,7 @@ let j = null;
 function vt() {
   return j || (j = import("./wasm/dwgparser.js").then((t) => t.default())), j;
 }
-function F(t, e) {
+function L(t, e) {
   const o = t.size(), n = new Array(o);
   for (let r = 0; r < o; r++) n[r] = e(t.get(r));
   return t.delete(), n;
@@ -211,8 +211,8 @@ function _(t) {
 }
 function kt(t) {
   return {
-    points: F(t.points, U),
-    bulges: F(t.bulges, _)
+    points: L(t.points, U),
+    bulges: L(t.bulges, _)
   };
 }
 function At(t) {
@@ -220,17 +220,17 @@ function At(t) {
     angleRad: t.angleRad,
     basePoint: U(t.basePoint),
     offset: U(t.offset),
-    dashPattern: F(t.dashPattern, _)
+    dashPattern: L(t.dashPattern, _)
   };
 }
 function Bt(t) {
   return {
     kind: t.kind.value,
-    points: F(t.points, U),
-    bulges: F(t.bulges, _),
-    startWidths: F(t.startWidths, _),
-    endWidths: F(t.endWidths, _),
-    dashPattern: F(t.dashPattern, _),
+    points: L(t.points, U),
+    bulges: L(t.bulges, _),
+    startWidths: L(t.startWidths, _),
+    endWidths: L(t.endWidths, _),
+    dashPattern: L(t.dashPattern, _),
     center: U(t.center),
     radius: t.radius,
     startAngleRad: t.startAngleRad,
@@ -242,12 +242,13 @@ function Bt(t) {
     textAngleRad: t.textAngleRad,
     textHAlign: t.textHAlign.value,
     textVAlign: t.textVAlign.value,
+    textWidthFactor: t.textWidthFactor,
     fontFile: t.fontFile,
-    hatchLoops: F(t.hatchLoops, kt),
+    hatchLoops: L(t.hatchLoops, kt),
     hatchFillKind: t.hatchFillKind.value,
     hatchColor2: { r: t.hatchColor2.r, g: t.hatchColor2.g, b: t.hatchColor2.b },
     hatchGradientAngleRad: t.hatchGradientAngleRad,
-    hatchPatternLines: F(t.hatchPatternLines, At)
+    hatchPatternLines: L(t.hatchPatternLines, At)
   };
 }
 function Rt(t) {
@@ -256,9 +257,9 @@ function Rt(t) {
 function St(t) {
   return t.toLowerCase().endsWith(".dwg") ? "dwg" : "dxf";
 }
-let Tt = 0;
-async function Xt(t, e) {
-  const o = await vt(), n = t instanceof Uint8Array ? t : new Uint8Array(t), r = `/input-${Tt++}.${St(e)}`;
+let Ft = 0;
+async function Tt(t, e) {
+  const o = await vt(), n = t instanceof Uint8Array ? t : new Uint8Array(t), r = `/input-${Ft++}.${St(e)}`;
   o.FS.writeFile(r, n);
   let s;
   try {
@@ -266,7 +267,7 @@ async function Xt(t, e) {
     const i = s.errorMessage();
     if (i)
       return { shapes: [], boundingBox: { minX: 0, minY: 0, maxX: 0, maxY: 0 }, errorMessage: i };
-    const a = F(s.shapes(), Bt), l = Rt(s.boundingBox());
+    const a = L(s.shapes(), Bt), l = Rt(s.boundingBox());
     return { shapes: a, boundingBox: l, errorMessage: "" };
   } finally {
     s == null || s.delete();
@@ -276,15 +277,15 @@ async function Xt(t, e) {
     }
   }
 }
-var N = /* @__PURE__ */ ((t) => (t[t.Line = 0] = "Line", t[t.Circle = 1] = "Circle", t[t.Arc = 2] = "Arc", t[t.Polyline = 3] = "Polyline", t[t.Text = 4] = "Text", t[t.Hatch = 5] = "Hatch", t))(N || {}), E = /* @__PURE__ */ ((t) => (t[t.Left = 0] = "Left", t[t.Center = 1] = "Center", t[t.Right = 2] = "Right", t))(E || {}), W = /* @__PURE__ */ ((t) => (t[t.Baseline = 0] = "Baseline", t[t.Bottom = 1] = "Bottom", t[t.Middle = 2] = "Middle", t[t.Top = 3] = "Top", t))(W || {}), O = /* @__PURE__ */ ((t) => (t[t.Solid = 0] = "Solid", t[t.Gradient = 1] = "Gradient", t[t.Pattern = 2] = "Pattern", t))(O || {});
-function Ct(t) {
+var D = /* @__PURE__ */ ((t) => (t[t.Line = 0] = "Line", t[t.Circle = 1] = "Circle", t[t.Arc = 2] = "Arc", t[t.Polyline = 3] = "Polyline", t[t.Text = 4] = "Text", t[t.Hatch = 5] = "Hatch", t))(D || {}), E = /* @__PURE__ */ ((t) => (t[t.Left = 0] = "Left", t[t.Center = 1] = "Center", t[t.Right = 2] = "Right", t))(E || {}), N = /* @__PURE__ */ ((t) => (t[t.Baseline = 0] = "Baseline", t[t.Bottom = 1] = "Bottom", t[t.Middle = 2] = "Middle", t[t.Top = 3] = "Top", t))(N || {}), O = /* @__PURE__ */ ((t) => (t[t.Solid = 0] = "Solid", t[t.Gradient = 1] = "Gradient", t[t.Pattern = 2] = "Pattern", t))(O || {});
+function Xt(t) {
   return t.minX <= t.maxX && t.minY <= t.maxY;
 }
-function D(t) {
+function W(t) {
   return `rgb(${t.r},${t.g},${t.b})`;
 }
-const Yt = 20;
-function Lt(t, e, o, n = Yt) {
+const Ct = 20;
+function Yt(t, e, o, n = Ct) {
   const r = Math.max(1, e - 2 * n), s = Math.max(1, o - 2 * n);
   let i = t.maxX - t.minX, a = t.maxY - t.minY;
   i < 1e-9 && (i = a > 1e-9 ? a : 1), a < 1e-9 && (a = i);
@@ -298,24 +299,24 @@ function K(t, e, o, n) {
 function tt(t, e, o) {
   return new DOMMatrix([t.a, t.b, t.c, t.d, t.e + e, t.f + o]);
 }
-function Ft(t, e, o) {
+function Lt(t, e, o) {
   if (Math.abs(o) < 1e-9) return null;
   const n = e.x - t.x, r = e.y - t.y, s = Math.hypot(n, r);
   if (s < 1e-9) return null;
-  const i = o >= 0 ? 1 : -1, a = 2 * Math.atan(Math.abs(o)), l = s / 2 / Math.sin(a), c = (t.x + e.x) / 2, h = (t.y + e.y) / 2, u = (i > 0 ? -r : r) / s, p = (i > 0 ? n : -n) / s, x = l * Math.cos(a), M = { x: c + u * x, y: h + p * x };
-  let m = Math.atan2(t.y - M.y, t.x - M.x), P = Math.atan2(e.y - M.y, e.x - M.x);
-  return i > 0 ? P < m && (P += 2 * Math.PI) : P > m && (P -= 2 * Math.PI), { center: M, radius: l, startAngle: m, endAngle: P };
+  const i = o >= 0 ? 1 : -1, a = 2 * Math.atan(Math.abs(o)), l = s / 2 / Math.sin(a), c = (t.x + e.x) / 2, h = (t.y + e.y) / 2, u = (i > 0 ? -r : r) / s, m = (i > 0 ? n : -n) / s, x = l * Math.cos(a), M = { x: c + u * x, y: h + m * x };
+  let p = Math.atan2(t.y - M.y, t.x - M.x), w = Math.atan2(e.y - M.y, e.x - M.x);
+  return i > 0 ? w < p && (w += 2 * Math.PI) : w > p && (w -= 2 * Math.PI), { center: M, radius: l, startAngle: p, endAngle: w };
 }
 function G(t, e, o, n) {
-  const r = Ft(e, o, n);
+  const r = Lt(e, o, n);
   if (!r) {
     t.push(o);
     return;
   }
   const { center: s, radius: i, startAngle: a, endAngle: l } = r, c = l - a, h = Math.min(64, Math.max(2, Math.ceil(Math.abs(c) / (Math.PI / 24))));
   for (let u = 1; u <= h; u++) {
-    const p = a + c * u / h;
-    t.push({ x: s.x + i * Math.cos(p), y: s.y + i * Math.sin(p) });
+    const m = a + c * u / h;
+    t.push({ x: s.x + i * Math.cos(m), y: s.y + i * Math.sin(m) });
   }
 }
 function It(t, e, o) {
@@ -336,48 +337,48 @@ function $(t, e, o, n) {
   let s = 0, i = n[0], a = !0;
   const l = o ? e.length : e.length - 1;
   for (let c = 0; c < l; c++) {
-    const h = e[c], u = e[(c + 1) % e.length], p = Math.hypot(u.x - h.x, u.y - h.y);
-    if (p < 1e-12) continue;
+    const h = e[c], u = e[(c + 1) % e.length], m = Math.hypot(u.x - h.x, u.y - h.y);
+    if (m < 1e-12) continue;
     let x = 0;
-    for (; x < p; ) {
-      const M = Math.min(i, p - x), m = x / p, P = (x + M) / p;
-      a && (r.moveTo(h.x + (u.x - h.x) * m, h.y + (u.y - h.y) * m), r.lineTo(h.x + (u.x - h.x) * P, h.y + (u.y - h.y) * P)), x += M, i -= M, i <= 1e-9 && (s = (s + 1) % n.length, i = n[s], a = !a);
+    for (; x < m; ) {
+      const M = Math.min(i, m - x), p = x / m, w = (x + M) / m;
+      a && (r.moveTo(h.x + (u.x - h.x) * p, h.y + (u.y - h.y) * p), r.lineTo(h.x + (u.x - h.x) * w, h.y + (u.y - h.y) * w)), x += M, i -= M, i <= 1e-9 && (s = (s + 1) % n.length, i = n[s], a = !a);
     }
   }
   t.stroke(r);
 }
-function Dt(t, e, o, n, r) {
+function Wt(t, e, o, n, r) {
   const s = o.x - e.x, i = o.y - e.y, a = Math.hypot(s, i);
   if (a < 1e-9) return;
-  const l = -i / a, c = s / a, h = { x: e.x + l * n / 2, y: e.y + c * n / 2 }, u = { x: o.x + l * r / 2, y: o.y + c * r / 2 }, p = { x: o.x - l * r / 2, y: o.y - c * r / 2 }, x = { x: e.x - l * n / 2, y: e.y - c * n / 2 };
-  t.moveTo(h.x, h.y), t.lineTo(u.x, u.y), t.lineTo(p.x, p.y), t.lineTo(x.x, x.y), t.closePath();
+  const l = -i / a, c = s / a, h = { x: e.x + l * n / 2, y: e.y + c * n / 2 }, u = { x: o.x + l * r / 2, y: o.y + c * r / 2 }, m = { x: o.x - l * r / 2, y: o.y - c * r / 2 }, x = { x: e.x - l * n / 2, y: e.y - c * n / 2 };
+  t.moveTo(h.x, h.y), t.lineTo(u.x, u.y), t.lineTo(m.x, m.y), t.lineTo(x.x, x.y), t.closePath();
 }
-function Nt(t, e) {
+function Dt(t, e) {
   const o = e.points.length, n = e.bulges.length === o, r = e.closed ? o : o - 1, s = e.dashPattern, i = new Path2D(), a = new Path2D();
-  let l = !1, c = !1, h = 0, u = s.length === 0 ? 0 : s[0], p = !0;
+  let l = !1, c = !1, h = 0, u = s.length === 0 ? 0 : s[0], m = !0;
   for (let x = 0; x < r; x++) {
-    const M = e.points[x], m = e.points[(x + 1) % o], P = n ? e.bulges[x] : 0, b = e.startWidths[x], k = e.endWidths[x], T = [M];
-    G(T, M, m, P);
-    const X = T.length - 1;
-    for (let B = 0; B < X; B++) {
-      const w = T[B], v = T[B + 1], R = Math.hypot(v.x - w.x, v.y - w.y);
-      if (R < 1e-12) continue;
-      const L = B / X, f = (B + 1) / X, g = b + (k - b) * L, d = b + (k - b) * f;
+    const M = e.points[x], p = e.points[(x + 1) % o], w = n ? e.bulges[x] : 0, b = e.startWidths[x], k = e.endWidths[x], T = [M];
+    G(T, M, p, w);
+    const Y = T.length - 1;
+    for (let R = 0; R < Y; R++) {
+      const P = T[R], v = T[R + 1], A = Math.hypot(v.x - P.x, v.y - P.y);
+      if (A < 1e-12) continue;
+      const S = R / Y, f = (R + 1) / Y, g = b + (k - b) * S, d = b + (k - b) * f;
       let y = 0;
-      for (; y < R; ) {
-        const S = s.length === 0 ? R : Math.min(u, R - y), A = y / R, I = (y + S) / R;
-        if (p) {
-          const C = { x: w.x + (v.x - w.x) * A, y: w.y + (v.y - w.y) * A }, Y = { x: w.x + (v.x - w.x) * I, y: w.y + (v.y - w.y) * I }, q = g + (d - g) * A, V = g + (d - g) * I;
-          q === 0 && V === 0 ? (i.moveTo(C.x, C.y), i.lineTo(Y.x, Y.y), l = !0) : (Dt(a, C, Y, q, V), c = !0);
+      for (; y < A; ) {
+        const F = s.length === 0 ? A : Math.min(u, A - y), B = y / A, I = (y + F) / A;
+        if (m) {
+          const X = { x: P.x + (v.x - P.x) * B, y: P.y + (v.y - P.y) * B }, C = { x: P.x + (v.x - P.x) * I, y: P.y + (v.y - P.y) * I }, q = g + (d - g) * B, V = g + (d - g) * I;
+          q === 0 && V === 0 ? (i.moveTo(X.x, X.y), i.lineTo(C.x, C.y), l = !0) : (Wt(a, X, C, q, V), c = !0);
         }
-        if (y += S, s.length === 0) break;
-        u -= S, u <= 1e-9 && (h = (h + 1) % s.length, u = s[h], p = !p);
+        if (y += F, s.length === 0) break;
+        u -= F, u <= 1e-9 && (h = (h + 1) % s.length, u = s[h], m = !m);
       }
     }
   }
-  l && t.stroke(i), c && (t.fillStyle = D(e.color), t.fill(a, "nonzero"));
+  l && t.stroke(i), c && (t.fillStyle = W(e.color), t.fill(a, "nonzero"));
 }
-function Wt(t) {
+function Nt(t) {
   const e = t.points.length;
   if (e < 2) return [];
   const o = t.bulges.length === e, n = [t.points[0]];
@@ -389,7 +390,7 @@ function _t(t) {
   const e = new Path2D();
   let o = 1 / 0, n = 1 / 0, r = -1 / 0, s = -1 / 0;
   for (const i of t) {
-    const a = Wt(i);
+    const a = Nt(i);
     if (!(a.length < 2)) {
       e.moveTo(a[0].x, a[0].y);
       for (let l = 1; l < a.length; l++)
@@ -400,47 +401,47 @@ function _t(t) {
   return { path: e, bounds: { minX: o, minY: n, maxX: r, maxY: s } };
 }
 function Ut(t, e, o) {
-  const n = Math.cos(e.angleRad), r = Math.sin(e.angleRad), s = -r, i = n, a = e.basePoint, l = e.offset, c = (w, v, R, L) => w * R + v * L, h = c(l.x, l.y, s, i), u = c(l.x, l.y, n, r);
+  const n = Math.cos(e.angleRad), r = Math.sin(e.angleRad), s = -r, i = n, a = e.basePoint, l = e.offset, c = (P, v, A, S) => P * A + v * S, h = c(l.x, l.y, s, i), u = c(l.x, l.y, n, r);
   if (Math.abs(h) < 1e-9) return;
-  const p = [
+  const m = [
     { x: o.minX, y: o.minY },
     { x: o.maxX, y: o.minY },
     { x: o.minX, y: o.maxY },
     { x: o.maxX, y: o.maxY }
   ];
-  let x = 1 / 0, M = -1 / 0, m = 1 / 0, P = -1 / 0;
-  for (const w of p) {
-    const v = w.x - a.x, R = w.y - a.y;
-    x = Math.min(x, c(v, R, s, i)), M = Math.max(M, c(v, R, s, i)), m = Math.min(m, c(v, R, n, r)), P = Math.max(P, c(v, R, n, r));
+  let x = 1 / 0, M = -1 / 0, p = 1 / 0, w = -1 / 0;
+  for (const P of m) {
+    const v = P.x - a.x, A = P.y - a.y;
+    x = Math.min(x, c(v, A, s, i)), M = Math.max(M, c(v, A, s, i)), p = Math.min(p, c(v, A, n, r)), w = Math.max(w, c(v, A, n, r));
   }
   let b = Math.floor(x / h) - 1, k = Math.ceil(M / h) + 1;
   if (b > k && ([b, k] = [k, b]), k - b > 1e5) return;
   let T = 0;
-  for (const w of e.dashPattern) T += Math.abs(w);
-  const X = Math.max(T * 0.02, 1e-6), B = new Path2D();
-  for (let w = b; w <= k; w++) {
-    const v = a.x + s * (w * h), R = a.y + i * (w * h), L = { x: v + n * m, y: R + r * m }, f = P - m;
+  for (const P of e.dashPattern) T += Math.abs(P);
+  const Y = Math.max(T * 0.02, 1e-6), R = new Path2D();
+  for (let P = b; P <= k; P++) {
+    const v = a.x + s * (P * h), A = a.y + i * (P * h), S = { x: v + n * p, y: A + r * p }, f = w - p;
     if (f <= 1e-9) continue;
     if (e.dashPattern.length === 0) {
-      B.moveTo(L.x, L.y), B.lineTo(v + n * P, R + r * P);
+      R.moveTo(S.x, S.y), R.lineTo(v + n * w, A + r * w);
       continue;
     }
-    const g = w * u;
-    let d = (m - g) % T;
+    const g = P * u;
+    let d = (p - g) % T;
     d < 0 && (d += T);
-    let y = 0, S = 0;
+    let y = 0, F = 0;
     for (; y + 1 < e.dashPattern.length; y++) {
-      const Y = e.dashPattern[y] === 0 ? X : Math.abs(e.dashPattern[y]);
-      if (d < S + Y) break;
-      S += Y;
+      const C = e.dashPattern[y] === 0 ? Y : Math.abs(e.dashPattern[y]);
+      if (d < F + C) break;
+      F += C;
     }
-    let A = S + (e.dashPattern[y] === 0 ? X : Math.abs(e.dashPattern[y])) - d, I = e.dashPattern[y] >= 0, C = 0;
-    for (; C < f; ) {
-      const Y = Math.min(A, f - C);
-      I && (B.moveTo(L.x + n * C, L.y + r * C), B.lineTo(L.x + n * (C + Y), L.y + r * (C + Y))), C += Y, A -= Y, A <= 1e-9 && (y = (y + 1) % e.dashPattern.length, A = e.dashPattern[y] === 0 ? X : Math.abs(e.dashPattern[y]), I = e.dashPattern[y] >= 0);
+    let B = F + (e.dashPattern[y] === 0 ? Y : Math.abs(e.dashPattern[y])) - d, I = e.dashPattern[y] >= 0, X = 0;
+    for (; X < f; ) {
+      const C = Math.min(B, f - X);
+      I && (R.moveTo(S.x + n * X, S.y + r * X), R.lineTo(S.x + n * (X + C), S.y + r * (X + C))), X += C, B -= C, B <= 1e-9 && (y = (y + 1) % e.dashPattern.length, B = e.dashPattern[y] === 0 ? Y : Math.abs(e.dashPattern[y]), I = e.dashPattern[y] >= 0);
     }
   }
-  t.stroke(B);
+  t.stroke(R);
 }
 const Et = 5 / 3;
 function ot(t, e, o) {
@@ -452,41 +453,41 @@ function et(t, e, o) {
   for (const r of o) n += ot(t, e, r.codePointAt(0) ?? 0).advance;
   return n;
 }
-function Gt(t, e, o, n, r, s, i) {
-  const a = r / 9, l = r * o.lineSpacingFactor * Et, c = l * e.length;
-  let h;
-  switch (i) {
-    case W.Top:
-      h = r;
+function Gt(t, e, o, n, r, s, i, a) {
+  const l = r / 9, c = l * s, h = r * o.lineSpacingFactor * Et, u = h * e.length;
+  let m;
+  switch (a) {
+    case N.Top:
+      m = r;
       break;
-    case W.Middle:
-      h = r - c / 2;
+    case N.Middle:
+      m = r - u / 2;
       break;
-    case W.Bottom:
-      h = r - c;
+    case N.Bottom:
+      m = r - u;
       break;
     default:
-      h = 0;
+      m = 0;
   }
-  const u = new Path2D();
-  let p = h;
-  for (const x of e) {
-    let M = 0;
-    s === E.Center ? M = -et(o, n, x) * a / 2 : s === E.Right && (M = -et(o, n, x) * a);
-    let m = 0;
-    for (const P of x) {
-      const b = P.codePointAt(0) ?? 0, { glyph: k, advance: T } = ot(o, n, b);
-      if (k)
-        for (const X of k.strokes)
-          for (let B = 1; B < X.length; B++) {
-            const w = X[B - 1], v = X[B];
-            u.moveTo(M + (m + w.x) * a, p - w.y * a), u.lineTo(M + (m + v.x) * a, p - v.y * a);
+  const x = new Path2D();
+  let M = m;
+  for (const p of e) {
+    let w = 0;
+    i === E.Center ? w = -et(o, n, p) * c / 2 : i === E.Right && (w = -et(o, n, p) * c);
+    let b = 0;
+    for (const k of p) {
+      const T = k.codePointAt(0) ?? 0, { glyph: Y, advance: R } = ot(o, n, T);
+      if (Y)
+        for (const P of Y.strokes)
+          for (let v = 1; v < P.length; v++) {
+            const A = P[v - 1], S = P[v];
+            x.moveTo(w + (b + A.x) * c, M - A.y * l), x.lineTo(w + (b + S.x) * c, M - S.y * l);
           }
-      m += T;
+      b += R;
     }
-    p += l;
+    M += h;
   }
-  t.stroke(u);
+  t.stroke(x);
 }
 function Ht(t, e, o, n, r) {
   if (!e.text) return;
@@ -495,31 +496,31 @@ function Ht(t, e, o, n, r) {
   const i = o.transformPoint(new DOMPoint(e.center.x, e.center.y));
   let a = Math.round(e.textHeightDoc * s);
   a < 1 && (a = 1), t.save(), t.setTransform(n, 0, 0, n, 0, 0), t.translate(i.x, i.y), t.rotate(-e.textAngleRad);
-  const l = e.text.split(`
-`), c = (r == null ? void 0 : r.fontFor(e.fontFile)) ?? null;
-  if (c) {
-    t.strokeStyle = D(e.color), t.lineWidth = 1 / n, Gt(t, l, c, (r == null ? void 0 : r.fallbackFont) ?? null, a, e.textHAlign, e.textVAlign), t.restore();
+  const l = e.textWidthFactor > 0 ? e.textWidthFactor : 1, c = e.text.split(`
+`), h = (r == null ? void 0 : r.fontFor(e.fontFile)) ?? null;
+  if (h) {
+    t.strokeStyle = W(e.color), t.lineWidth = 1 / n, Gt(t, c, h, (r == null ? void 0 : r.fallbackFont) ?? null, a, l, e.textHAlign, e.textVAlign), t.restore();
     return;
   }
-  t.font = `${a}px sans-serif`, t.fillStyle = D(e.color), t.textBaseline = "alphabetic", t.textAlign = e.textHAlign === E.Center ? "center" : e.textHAlign === E.Right ? "right" : "left";
-  const h = t.measureText("Mgjy"), u = h.fontBoundingBoxAscent ?? a * 0.8, p = h.fontBoundingBoxDescent ?? a * 0.2, x = u + p, M = x * l.length;
-  let m;
+  t.scale(l, 1), t.font = `${a}px sans-serif`, t.fillStyle = W(e.color), t.textBaseline = "alphabetic", t.textAlign = e.textHAlign === E.Center ? "center" : e.textHAlign === E.Right ? "right" : "left";
+  const u = t.measureText("Mgjy"), m = u.fontBoundingBoxAscent ?? a * 0.8, x = u.fontBoundingBoxDescent ?? a * 0.2, M = m + x, p = M * c.length;
+  let w;
   switch (e.textVAlign) {
-    case W.Top:
-      m = u;
+    case N.Top:
+      w = m;
       break;
-    case W.Middle:
-      m = u - M / 2;
+    case N.Middle:
+      w = m - p / 2;
       break;
-    case W.Bottom:
-      m = u - M;
+    case N.Bottom:
+      w = m - p;
       break;
     default:
-      m = 0;
+      w = 0;
   }
-  let P = m;
-  for (const b of l)
-    t.fillText(b, 0, P), P += x;
+  let b = w;
+  for (const k of c)
+    t.fillText(k, 0, b), b += M;
   t.restore();
 }
 const z = 48;
@@ -558,7 +559,7 @@ function jt(t, e) {
     $(t, r, !1, e.dashPattern);
     return;
   }
-  Nt(t, e);
+  Dt(t, e);
 }
 function qt(t, e) {
   if (e.hatchLoops.length === 0) return;
@@ -566,12 +567,12 @@ function qt(t, e) {
   if (Number.isFinite(n.minX))
     switch (e.hatchFillKind) {
       case O.Solid:
-        t.fillStyle = D(e.color), t.fill(o, "evenodd");
+        t.fillStyle = W(e.color), t.fill(o, "evenodd");
         break;
       case O.Gradient: {
         const r = n.maxX - n.minX, s = n.maxY - n.minY, i = 0.5 * Math.hypot(r, s);
         if (i < 1e-9) {
-          t.fillStyle = D(e.color), t.fill(o, "evenodd");
+          t.fillStyle = W(e.color), t.fill(o, "evenodd");
           break;
         }
         const a = n.minX + r / 2, l = n.minY + s / 2, c = Math.cos(e.hatchGradientAngleRad), h = Math.sin(e.hatchGradientAngleRad), u = t.createLinearGradient(
@@ -580,11 +581,11 @@ function qt(t, e) {
           a + c * i,
           l + h * i
         );
-        u.addColorStop(0, D(e.color)), u.addColorStop(1, D(e.hatchColor2)), t.fillStyle = u, t.fill(o, "evenodd");
+        u.addColorStop(0, W(e.color)), u.addColorStop(1, W(e.hatchColor2)), t.fillStyle = u, t.fill(o, "evenodd");
         break;
       }
       case O.Pattern: {
-        t.save(), t.clip(o, "evenodd"), t.strokeStyle = D(e.color);
+        t.save(), t.clip(o, "evenodd"), t.strokeStyle = W(e.color);
         for (const r of e.hatchPatternLines) Ut(t, r, n);
         t.restore();
         break;
@@ -597,23 +598,23 @@ function Vt(t, e, o) {
   const a = Math.abs(n.a), l = a > 0 ? 1 / a : 1;
   t.lineWidth = l;
   for (const c of e) {
-    switch (t.strokeStyle = D(c.color), c.kind) {
-      case N.Line:
+    switch (t.strokeStyle = W(c.color), c.kind) {
+      case D.Line:
         Ot(t, c);
         break;
-      case N.Circle:
+      case D.Circle:
         zt(t, c);
         break;
-      case N.Arc:
+      case D.Arc:
         $t(t, c);
         break;
-      case N.Polyline:
+      case D.Polyline:
         jt(t, c);
         break;
-      case N.Text:
+      case D.Text:
         Ht(t, c, n, r, s);
         break;
-      case N.Hatch:
+      case D.Hatch:
         qt(t, c);
         break;
     }
@@ -630,17 +631,17 @@ const Zt = /* @__PURE__ */ rt({
   emits: ["loaded", "error"],
   setup(t, { expose: e, emit: o }) {
     const n = t, r = new bt(n.fontsBaseUrl), s = o, i = H(null), a = H(null), l = it(null), c = H(!1), h = H(null);
-    let u = null, p = !1, x = null;
+    let u = null, m = !1, x = null;
     const M = /* @__PURE__ */ new Map();
-    let m = null;
-    const P = st(() => c.value ? "Loading drawing…" : h.value ? h.value : !l.value || l.value.shapes.length === 0 ? "No drawing loaded" : null);
+    let p = null;
+    const w = st(() => c.value ? "Loading drawing…" : h.value ? h.value : !l.value || l.value.shapes.length === 0 ? "No drawing loaded" : null);
     function b() {
       const f = a.value;
       if (!f || !l.value) return;
       const g = l.value.boundingBox;
-      if (!Ct(g)) return;
+      if (!Xt(g)) return;
       const d = f.clientWidth, y = f.clientHeight;
-      u = Lt(g, d, y), p = !0;
+      u = Yt(g, d, y), m = !0;
     }
     function k() {
       const f = a.value;
@@ -648,12 +649,12 @@ const Zt = /* @__PURE__ */ rt({
       const g = f.getContext("2d");
       if (!g) return;
       g.setTransform(1, 0, 0, 1, 0, 0), g.fillStyle = "black", g.fillRect(0, 0, f.width, f.height);
-      const d = P.value;
+      const d = w.value;
       if (d) {
-        const S = window.devicePixelRatio || 1;
-        g.setTransform(S, 0, 0, S, 0, 0), g.fillStyle = "gray", g.font = "14px sans-serif", g.textAlign = "center", g.textBaseline = "middle", g.fillText(d, f.clientWidth / 2, f.clientHeight / 2);
+        const F = window.devicePixelRatio || 1;
+        g.setTransform(F, 0, 0, F, 0, 0), g.fillStyle = "gray", g.font = "14px sans-serif", g.textAlign = "center", g.textBaseline = "middle", g.fillText(d, f.clientWidth / 2, f.clientHeight / 2);
       }
-      if (!l.value || !u || !p) return;
+      if (!l.value || !u || !m) return;
       g.imageSmoothingEnabled = !0;
       const y = window.devicePixelRatio || 1;
       Vt(g, l.value.shapes, { documentToScreen: u, pixelRatio: y, fonts: r });
@@ -661,12 +662,12 @@ const Zt = /* @__PURE__ */ rt({
     function T(f, g) {
       const d = a.value, y = i.value;
       if (!d || !y) return;
-      const S = Math.max(1, Math.floor(f ?? y.clientWidth)), A = Math.max(1, Math.floor(g ?? y.clientHeight)), I = window.devicePixelRatio || 1, C = Math.round(S * I), Y = Math.round(A * I);
-      d.width === C && d.height === Y || (d.width = C, d.height = Y, b(), k());
+      const F = Math.max(1, Math.floor(f ?? y.clientWidth)), B = Math.max(1, Math.floor(g ?? y.clientHeight)), I = window.devicePixelRatio || 1, X = Math.round(F * I), C = Math.round(B * I);
+      d.width === X && d.height === C || (d.width = X, d.height = C, b(), k());
     }
-    async function X() {
+    async function Y() {
       const f = n.source;
-      if (u = null, p = !1, l.value = null, h.value = null, !f) {
+      if (u = null, m = !1, l.value = null, h.value = null, !f) {
         k();
         return;
       }
@@ -674,9 +675,9 @@ const Zt = /* @__PURE__ */ rt({
       try {
         let g, d;
         if (typeof f == "string") {
-          const A = await fetch(f);
-          if (!A.ok) throw new Error(`Failed to fetch ${f}: ${A.status}`);
-          g = await A.arrayBuffer(), d = n.fileName ?? f;
+          const B = await fetch(f);
+          if (!B.ok) throw new Error(`Failed to fetch ${f}: ${B.status}`);
+          g = await B.arrayBuffer(), d = n.fileName ?? f;
         } else if (f instanceof File)
           g = await f.arrayBuffer(), d = n.fileName ?? f.name;
         else {
@@ -684,13 +685,13 @@ const Zt = /* @__PURE__ */ rt({
             throw new Error("fileName prop is required when source is raw bytes (need it to tell .dxf from .dwg)");
           d = n.fileName;
         }
-        const y = await Xt(g, d);
+        const y = await Tt(g, d);
         if (y.errorMessage) {
           h.value = y.errorMessage, s("error", y.errorMessage);
           return;
         }
-        const S = y.shapes.filter((A) => A.kind === N.Text).map((A) => A.fontFile);
-        await r.preload(S), l.value = y, b(), s("loaded", y);
+        const F = y.shapes.filter((B) => B.kind === D.Text).map((B) => B.fontFile);
+        await r.preload(F), l.value = y, b(), s("loaded", y);
       } catch (g) {
         const d = g instanceof Error ? g.message : String(g);
         h.value = d, s("error", d);
@@ -698,15 +699,15 @@ const Zt = /* @__PURE__ */ rt({
         c.value = !1, k();
       }
     }
-    function B(f) {
-      if (!u || !p) return;
+    function R(f) {
+      if (!u || !m) return;
       f.preventDefault();
       const g = f.deltaY < 0 ? 1.15 : 1 / 1.15, d = a.value;
       if (!d) return;
-      const y = d.getBoundingClientRect(), S = f.clientX - y.left, A = f.clientY - y.top;
-      u = K(u, S, A, g), k();
+      const y = d.getBoundingClientRect(), F = f.clientX - y.left, B = f.clientY - y.top;
+      u = K(u, F, B, g), k();
     }
-    function w() {
+    function P() {
       const f = a.value;
       if (!f || M.size !== 2) return null;
       const g = f.getBoundingClientRect(), [d, y] = [...M.values()];
@@ -717,22 +718,22 @@ const Zt = /* @__PURE__ */ rt({
       };
     }
     function v(f) {
-      f.pointerType === "mouse" && f.button !== 0 || M.size >= 2 || (f.preventDefault(), M.set(f.pointerId, { x: f.clientX, y: f.clientY }), f.currentTarget.setPointerCapture(f.pointerId), m = w());
+      f.pointerType === "mouse" && f.button !== 0 || M.size >= 2 || (f.preventDefault(), M.set(f.pointerId, { x: f.clientX, y: f.clientY }), f.currentTarget.setPointerCapture(f.pointerId), p = P());
     }
-    function R(f) {
+    function A(f) {
       const g = M.get(f.pointerId);
       if (!(!g || !u)) {
         if (M.set(f.pointerId, { x: f.clientX, y: f.clientY }), M.size === 2) {
-          const d = w();
+          const d = P();
           if (!d) return;
-          m && m.distance > 0 && d.distance > 0 && (u = tt(u, d.midX - m.midX, d.midY - m.midY), u = K(u, d.midX, d.midY, d.distance / m.distance), k()), m = d;
+          p && p.distance > 0 && d.distance > 0 && (u = tt(u, d.midX - p.midX, d.midY - p.midY), u = K(u, d.midX, d.midY, d.distance / p.distance), k()), p = d;
           return;
         }
         u = tt(u, f.clientX - g.x, f.clientY - g.y), k();
       }
     }
-    function L(f) {
-      f.pointerType === "mouse" && f.type === "pointerup" && f.button !== 0 || (f.preventDefault(), M.delete(f.pointerId), m = null);
+    function S(f) {
+      f.pointerType === "mouse" && f.type === "pointerup" && f.button !== 0 || (f.preventDefault(), M.delete(f.pointerId), p = null);
     }
     return e({ zoomFit: () => {
       b(), k();
@@ -743,11 +744,11 @@ const Zt = /* @__PURE__ */ rt({
           const y = (g = d.contentBoxSize) == null ? void 0 : g[0];
           y ? T(y.inlineSize, y.blockSize) : T(d.contentRect.width, d.contentRect.height);
         }
-      }), i.value && x.observe(i.value), T(), X();
+      }), i.value && x.observe(i.value), T(), Y();
     }), lt(() => {
       x == null || x.disconnect();
     }), ct(() => n.source, () => {
-      X();
+      Y();
     }), (f, g) => (ft(), ut("div", {
       ref_key: "containerEl",
       ref: i,
@@ -759,11 +760,11 @@ const Zt = /* @__PURE__ */ rt({
         ref: a,
         class: "dwg-viewer-canvas",
         style: { position: "absolute", inset: "0", width: "100%", height: "100%" },
-        onWheel: B,
+        onWheel: R,
         onPointerdown: v,
-        onPointermove: R,
-        onPointerup: L,
-        onPointercancel: L
+        onPointermove: A,
+        onPointerup: S,
+        onPointercancel: S
       }, null, 544)
     ], 512));
   }
@@ -776,13 +777,13 @@ const Zt = /* @__PURE__ */ rt({
 export {
   Kt as DwgViewer,
   O as HatchFillKind,
-  N as ShapeKind,
+  D as ShapeKind,
   E as TextHAlign,
-  W as TextVAlign,
-  Lt as computeZoomFitTransform,
-  Ct as isValidBoundingBox,
+  N as TextVAlign,
+  Yt as computeZoomFitTransform,
+  Xt as isValidBoundingBox,
   tt as panByScreenDelta,
-  Xt as parseDrawing,
+  Tt as parseDrawing,
   Vt as renderShapes,
   K as zoomAroundPoint
 };

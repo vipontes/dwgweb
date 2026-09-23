@@ -475,6 +475,20 @@ function lffLineWidth(font: LffFont, fallback: LffFont | null, line: string): nu
  * entity's anchor exactly like the browser-font path below, so this only
  * needs to place glyphs relative to that origin. `capHeightPx` is the
  * on-screen pixel size of the font's 9-design-unit cap height.
+ *
+ * `widthFactor` (DXF/DWG code 41) is baked directly into the horizontal
+ * (`xScale`) glyph-path coordinates below, NOT applied as a `ctx.scale()`
+ * on the canvas transform the way viewer_widget.cpp's Qt port applies it
+ * via `painter.scale()`. That shortcut is safe in the Qt/C++ renderer only
+ * because Qt's cosmetic (always-0-width) pens stay a constant device-pixel
+ * width regardless of the painter's transform; Canvas2D's `ctx.lineWidth`
+ * has no such immunity -- a non-uniform `ctx.scale(widthFactor, 1)` before
+ * `ctx.stroke()` would render this stroke anisotropically thinner/thicker
+ * in the horizontal direction than the vertical one. Scaling the path's own
+ * X coordinates instead (exactly how `capHeightPx`'s Y scale already works
+ * here) keeps the cosmetic `1 / pixelRatio` lineWidth genuinely constant in
+ * every direction, matching the Qt renderer's actual visual output instead
+ * of just its code shape.
  */
 function drawLffTextLines(
   ctx: CanvasRenderingContext2D,
@@ -482,10 +496,12 @@ function drawLffTextLines(
   font: LffFont,
   fallback: LffFont | null,
   capHeightPx: number,
+  widthFactor: number,
   hAlign: TextHAlign,
   vAlign: TextVAlign,
 ): void {
   const scale = capHeightPx / 9;
+  const xScale = scale * widthFactor;
   const linePitchPx = capHeightPx * font.lineSpacingFactor * LFF_LINE_SPACING_RATIO;
   const blockHeight = linePitchPx * lines.length;
 
@@ -508,8 +524,8 @@ function drawLffTextLines(
   let y = firstBaselineY;
   for (const line of lines) {
     let startX = 0;
-    if (hAlign === TextHAlign.Center) startX = (-lffLineWidth(font, fallback, line) * scale) / 2;
-    else if (hAlign === TextHAlign.Right) startX = -lffLineWidth(font, fallback, line) * scale;
+    if (hAlign === TextHAlign.Center) startX = (-lffLineWidth(font, fallback, line) * xScale) / 2;
+    else if (hAlign === TextHAlign.Right) startX = -lffLineWidth(font, fallback, line) * xScale;
 
     let penX = 0;
     for (const ch of line) {
@@ -526,8 +542,8 @@ function drawLffTextLines(
           for (let i = 1; i < stroke.length; i++) {
             const a = stroke[i - 1];
             const b = stroke[i];
-            path.moveTo(startX + (penX + a.x) * scale, y - a.y * scale);
-            path.lineTo(startX + (penX + b.x) * scale, y - b.y * scale);
+            path.moveTo(startX + (penX + a.x) * xScale, y - a.y * scale);
+            path.lineTo(startX + (penX + b.x) * xScale, y - b.y * scale);
           }
         }
       }
@@ -564,15 +580,28 @@ function drawText(
   ctx.translate(originScreen.x, originScreen.y);
   ctx.rotate(-s.textAngleRad);
 
+  // Width factor (DXF/DWG code 41) stretches/condenses glyphs along the
+  // text's own reading direction only, never its height. A malformed file
+  // with a non-positive width factor falls back to 1.0, matching
+  // viewer_widget.cpp's ShapeKind::Text case.
+  const widthFactor = s.textWidthFactor > 0 ? s.textWidthFactor : 1;
+
   const lines = s.text.split('\n');
   const lffFont = fonts?.fontFor(s.fontFile) ?? null;
   if (lffFont) {
     ctx.strokeStyle = rgbToCss(s.color);
     ctx.lineWidth = 1 / pixelRatio; // cosmetic: always ~1 device pixel, matching the rest of the renderer
-    drawLffTextLines(ctx, lines, lffFont, fonts?.fallbackFont ?? null, pixelHeight, s.textHAlign, s.textVAlign);
+    drawLffTextLines(ctx, lines, lffFont, fonts?.fallbackFont ?? null, pixelHeight, widthFactor, s.textHAlign, s.textVAlign);
     ctx.restore();
     return;
   }
+
+  // The browser-font fallback path only fills glyphs (no stroke), so unlike
+  // the LFF path above, a plain non-uniform ctx.scale() here is safe -- no
+  // cosmetic lineWidth to distort. This matches viewer_widget.cpp's Qt-font
+  // path, which gets the same painter.scale(widthFactor, 1.0) as the LFF
+  // path since Qt's cosmetic pens don't have this renderer's problem.
+  ctx.scale(widthFactor, 1);
 
   ctx.font = `${pixelHeight}px sans-serif`;
   ctx.fillStyle = rgbToCss(s.color);
