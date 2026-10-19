@@ -773,7 +773,7 @@ const Zt = /* @__PURE__ */ rt({
   for (const [n, r] of e)
     o[n] = r;
   return o;
-}, Kt = /* @__PURE__ */ Jt(Zt, [["__scopeId", "data-v-1148342e"]]);
+}, Kt = /* @__PURE__ */ Jt(Zt, [["__scopeId", "data-v-3d3aa960"]]);
 export {
   Kt as DwgViewer,
   O as HatchFillKind,
